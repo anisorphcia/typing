@@ -1,21 +1,15 @@
 <template>
   <div class="chat-wrapper">
     <div class="chat-history" ref="chatContainer">
-      <div
-        v-for="(msg, index) in chatMessages"
-        :key="index"
-        :class="['chat-bubble', msg.userId === myId ? 'right' : 'left']"
-      >
-        {{ msg.message }}
+      <div v-for="(msg, index) in chatMessages" :key="index"
+        :class="['chat-bubble', msg.userId === myId ? 'right' : 'left']">
+        <div class="message-text">{{ msg.message }}</div>
+        <div :class="['message-time', msg.userId === myId ? 'r-time' : 'l-time']">{{ formatTime(msg.timestamp) }}</div>
       </div>
     </div>
 
     <div class="input-box">
-      <input
-        v-model="input"
-        @keyup.enter="sendMessage"
-        placeholder="输入你的消息"
-      />
+      <input v-model="input" @keyup.enter="sendMessage" placeholder="输入你的消息" />
       <button @click="sendMessage">发送</button>
     </div>
   </div>
@@ -28,7 +22,7 @@ import { v4 as uuidv4 } from 'uuid'
 const myId = localStorage.getItem('userId') || uuidv4()
 localStorage.setItem('userId', myId)
 
-const chatMessages = ref<{ message: string; userId: string }[]>([])
+const chatMessages = ref<{ message: string; userId: string, timestamp: string }[]>([])
 const input = ref('')
 const chatContainer = ref<HTMLDivElement | null>(null)
 let eventSource: EventSource | null = null
@@ -45,7 +39,7 @@ const sendMessage = async () => {
   if (!input.value.trim()) return
 
   // 本地显示
-  chatMessages.value.push({ message: input.value, userId: myId })
+  chatMessages.value.push({ message: input.value, userId: myId, timestamp: new Date().toISOString() })
   scrollToBottom()
 
   await fetch('/api/chat/message', {
@@ -63,7 +57,7 @@ const startStream = () => {
   eventSource.onmessage = (event: MessageEvent) => {
     const data = JSON.parse(event.data)
     if (data.userId !== myId) {
-      chatMessages.value.push({ message: data.message, userId: data.userId })
+      chatMessages.value.push({ message: data.message, userId: data.userId, timestamp: data.timestamp, })
       scrollToBottom()
     }
   }
@@ -80,8 +74,23 @@ const getChatHistory = async () => {
   chatMessages.value = data.map((msg: { message: string; userId: string }) => ({
     message: msg.message,
     userId: msg.userId,
+    timestamp: msg.timestamp
   }))
   scrollToBottom()
+}
+
+const formatTime = (timestamp: string) => {
+  const options = {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  };
+  const date = new Date(timestamp)
+  return date.toLocaleString([], options)
 }
 
 onMounted(() => {
@@ -163,5 +172,20 @@ button {
   border-radius: 8px;
   background-color: #409eff;
   color: white;
+}
+
+.message-text {
+  margin-bottom: 4px;
+}
+
+.message-time.r-time {
+  font-size: 12px;
+  color: #888;
+  text-align: right;
+}
+.message-time.l-time {
+  font-size: 12px;
+  color: #888;
+  text-align: left;
 }
 </style>
