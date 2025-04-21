@@ -1,78 +1,80 @@
 <template>
-  <div class="chat-container">
-    <div v-for="(msg, index) in messages" :key="index" :class="['chat-bubble', msg.isUser ? 'user' : 'server']">
-      {{ msg.text }}
-      <span v-if="msg.isTyping && !msg.isUser">▍</span>
+  <div class="chat-wrapper">
+    <div class="chat-history" ref="chatContainer">
+      <div
+        v-for="(msg, index) in chatMessages"
+        :key="index"
+        :class="['chat-bubble', msg.userId === myId ? 'right' : 'left']"
+      >
+        {{ msg.message }}
+      </div>
     </div>
 
-    <div class="input-area">
-      <input v-model="input" @keyup.enter="sendMessage" placeholder="请输入内容..." />
+    <div class="input-box">
+      <input
+        v-model="input"
+        @keyup.enter="sendMessage"
+        placeholder="输入你的消息"
+      />
+      <button @click="sendMessage">发送</button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-import axios from 'axios'
+import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 
-interface Message {
-  text: string
-  isUser: boolean
-  isTyping?: boolean
-}
+const myId = localStorage.getItem('userId') || crypto.randomUUID()
+localStorage.setItem('userId', myId)
 
-const messages = ref<Message[]>([])
+const chatMessages = ref<{ message: string; userId: string }[]>([])
 const input = ref('')
+const chatContainer = ref<HTMLDivElement | null>(null)
 let eventSource: EventSource | null = null
-let currentServerMessage: Message | null = null
 
-// 发送用户消息
-const sendMessage = async () => {
-  const content = input.value.trim()
-  if (!content) return
-
-  // 添加用户气泡
-  messages.value.push({ text: content, isUser: true })
-
-  // 准备服务端气泡，文本先空
-  currentServerMessage = { text: '', isUser: false, isTyping: true }
-  messages.value.push(currentServerMessage)
-
-  // 清空输入框
-  input.value = ''
-
-  try {
-    await axios.post('/api/chat/message', { message: content })
-    // 后台接收后就会触发 SSE 推送
-  } catch (err) {
-    console.error('发送失败', err)
-    currentServerMessage.isTyping = false
-    currentServerMessage.text = '[发送失败]'
-  }
+const scrollToBottom = () => {
+  nextTick(() => {
+    if (chatContainer.value) {
+      chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+    }
+  })
 }
 
-// 初始化 SSE 长连接
-const startSSE = () => {
+const sendMessage = async () => {
+  if (!input.value.trim()) return
+
+  // 本地显示
+  chatMessages.value.push({ message: input.value, userId: myId })
+  scrollToBottom()
+
+  await fetch('/api/chat/message', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: input.value, userId: myId }),
+  })
+
+  input.value = ''
+}
+
+const startStream = () => {
   eventSource = new EventSource('/api/chat/stream')
 
   eventSource.onmessage = (event: MessageEvent) => {
-    if (event.data === '[DONE]') {
-      const lastMsg = messages.value.findLast(m => !m.isUser && m.isTyping)
-      if (lastMsg) lastMsg.isTyping = false
-    } else {
-      const lastMsg = messages.value.findLast(m => !m.isUser && m.isTyping)
-      if (lastMsg) lastMsg.text += event.data
+    const data = JSON.parse(event.data)
+    if (data.userId !== myId) {
+      chatMessages.value.push({ message: data.message, userId: data.userId })
+      scrollToBottom()
     }
   }
 
   eventSource.onerror = () => {
-    console.error('SSE 连接失败')
+    console.error('SSE 连接出错')
     eventSource?.close()
   }
 }
 
 onMounted(() => {
-  startSSE()
+  startStream()
 })
 
 onBeforeUnmount(() => {
@@ -81,66 +83,73 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.chat-container {
-  max-width: 600px;
-  margin: auto;
+.chat-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.chat-history {
+  flex: 1;
+  overflow-y: auto;
   padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
+  background: #fafafa;
 }
 
 .chat-bubble {
   max-width: 70%;
-  padding: 12px 16px;
-  border-radius: 18px;
+  padding: 10px 14px;
+  border-radius: 16px;
   white-space: pre-wrap;
-  position: relative;
-  font-size: 16px;
   line-height: 1.5;
+  font-size: 16px;
+  position: relative;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-.user {
-  align-self: flex-end;
-  background-color: #007bff;
-  color: white;
-  border-bottom-right-radius: 0;
-}
-
-.user::after {
-  content: '';
-  position: absolute;
-  right: -8px;
-  top: 8px;
-  border: 8px solid transparent;
-  border-left-color: #007bff;
-}
-
-.server {
+.chat-bubble.left {
+  background-color: #f0f0f0;
+  color: #333;
   align-self: flex-start;
-  background-color: #e5e5e5;
-  color: #000;
-  border-bottom-left-radius: 0;
+  border-top-left-radius: 0;
 }
 
-.server::after {
-  content: '';
-  position: absolute;
-  left: -8px;
-  top: 8px;
-  border: 8px solid transparent;
-  border-right-color: #e5e5e5;
+.chat-bubble.right {
+  background-color: #cce5ff;
+  color: #333;
+  align-self: flex-end;
+  border-top-right-radius: 0;
 }
 
-.input-area {
-  margin-top: auto;
+.input-box {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid #ddd;
+  background: white;
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
 }
 
 input {
-  width: 100%;
-  padding: 10px;
+  flex: 1;
+  padding: 8px;
   font-size: 16px;
-  border-radius: 8px;
   border: 1px solid #ccc;
+  border-radius: 8px;
+}
+
+button {
+  padding: 8px 16px;
+  font-size: 16px;
+  cursor: pointer;
+  border: none;
+  border-radius: 8px;
+  background-color: #409eff;
+  color: white;
 }
 </style>
