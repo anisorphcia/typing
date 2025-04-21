@@ -39,13 +39,14 @@ const sendMessage = async () => {
   if (!input.value.trim()) return
 
   // 本地显示
-  chatMessages.value.push({ message: input.value, userId: myId, timestamp: new Date().toISOString() })
+  const timestamp = new Date().toISOString()
+  chatMessages.value.push({ message: input.value, userId: myId, timestamp })
   scrollToBottom()
 
   await fetch('/api/chat/message', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: input.value, userId: myId }),
+    body: JSON.stringify({ message: input.value, userId: myId, timestamp }),
   })
 
   input.value = ''
@@ -71,7 +72,7 @@ const startStream = () => {
 const getChatHistory = async () => {
   const response = await fetch('/api/chat/history')
   const data = await response.json()
-  chatMessages.value = data.map((msg: { message: string; userId: string }) => ({
+  chatMessages.value = data.map((msg: { message: string; userId: string, timestamp: string }) => ({
     message: msg.message,
     userId: msg.userId,
     timestamp: msg.timestamp
@@ -80,18 +81,40 @@ const getChatHistory = async () => {
 }
 
 const formatTime = (timestamp: string) => {
-  const options = {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
-  };
+  
   const date = new Date(timestamp)
-  return date.toLocaleString([], options)
+  const now = new Date()
+
+  const padZero = (num: number) => num.toString().padStart(2, '0')
+
+  const isToday =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate()
+
+  const yesterday = new Date()
+  yesterday.setDate(now.getDate() - 1)
+
+  const isYesterday =
+    date.getFullYear() === yesterday.getFullYear() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getDate() === yesterday.getDate()
+
+  const hours = padZero(date.getHours())
+  const minutes = padZero(date.getMinutes())
+
+  if (isToday) {
+    return `${hours}:${minutes}`
+  } else if (isYesterday) {
+    return `昨天 ${hours}:${minutes}`
+  } else {
+    const y = date.getFullYear()
+    const m = padZero(date.getMonth() + 1)
+    const d = padZero(date.getDate())
+    return `${y}-${m}-${d} ${hours}:${minutes}`
+  }
 }
+
 
 onMounted(() => {
   getChatHistory()
@@ -179,13 +202,16 @@ button {
 }
 
 .message-time.r-time {
+  color: #aaa;
   font-size: 12px;
-  color: #888;
+  margin-top: 4px;
   text-align: right;
 }
+
 .message-time.l-time {
+  color: #aaa;
   font-size: 12px;
-  color: #888;
+  margin-top: 4px;
   text-align: left;
 }
 </style>
