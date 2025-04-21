@@ -23,8 +23,9 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { v4 as uuidv4 } from 'uuid'
 
-const myId = localStorage.getItem('userId') || crypto.randomUUID()
+const myId = localStorage.getItem('userId') || uuidv4()
 localStorage.setItem('userId', myId)
 
 const chatMessages = ref<{ message: string; userId: string }[]>([])
