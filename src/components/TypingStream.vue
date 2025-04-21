@@ -3,17 +3,17 @@
     <div class="chat-history" ref="chatContainer">
       <div v-for="(msg, index) in chatMessages" :key="msg.timestamp"
         :class="['chat-bubble-wrapper', msg.userId === myId ? 'right' : 'left']">
-
-        <div v-if="msg.userId !== myId" class="avatar" :style="{ backgroundColor: getUserInfo(msg.userId).color }">
-          {{ getUserInfo(msg.userId).nickname.slice(-2) }}
+        <div v-if="msg.userId !== myId" class="avatar"
+          :style="{ backgroundColor: getUserInfo(msg.userId).color || '#ccc' }">
+          {{ getUserInfo(msg.userId).nickname.slice(0, 2) || '??' }}
         </div>
         <div>
           <div class="nickname" v-if="msg.userId !== myId">{{ getUserInfo(msg.userId).nickname }}</div>
           <div class="chat-bubble" :class="msg.userId === myId ? 'right' : 'left'">
             <div class="message-text">{{ msg.message }}</div>
-            <div :class="['message-time', msg.userId === myId ? 'r-time' : 'l-time']">
-              {{ formatTime(msg.timestamp) }}
-            </div>
+          </div>
+          <div :class="['message-time', msg.userId === myId ? 'r-time' : 'l-time']">
+            {{ formatTime(msg.timestamp) }}
           </div>
         </div>
       </div>
@@ -61,10 +61,7 @@ const getUserInfo = (userId: string): { nickname: string; color: string } => {
     userInfoMap.set(userId, info)
     return info
   }
-
-  const info = userInfoMap.get(userId)
-  // 防御性判断（避免为 undefined）
-  return info || { nickname: '未知用户', color: '#ccc' }
+  return userInfoMap.get(userId)!
 }
 
 
