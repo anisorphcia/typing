@@ -74,7 +74,18 @@ const startStream = () => {
   }
 }
 
+const getChatHistory = async () => {
+  const response = await fetch('/api/chat/history')
+  const data = await response.json()
+  chatMessages.value = data.map((msg: { message: string; userId: string }) => ({
+    message: msg.message,
+    userId: msg.userId,
+  }))
+  scrollToBottom()
+}
+
 onMounted(() => {
+  getChatHistory()
   startStream()
 })
 

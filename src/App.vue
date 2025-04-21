@@ -1,7 +1,5 @@
 <template>
-  <div style="padding: 20px">
-    <TypingStream />
-  </div>
+  <TypingStream />
 </template>
 
 <script setup lang="ts">
