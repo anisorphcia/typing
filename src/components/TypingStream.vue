@@ -84,16 +84,20 @@ const scrollToBottom = () => {
 const sendMessage = async () => {
   if (!input.value.trim()) return
 
-  // 本地显示
-  const timestamp = new Date().toISOString()
-  chatMessages.value.push({ message: input.value, userId: myId, timestamp })
-  scrollToBottom()
+  try {
+    // 本地显示
+    const timestamp = new Date().toISOString()
+    chatMessages.value.push({ message: input.value, userId: myId, timestamp })
+    scrollToBottom()
 
-  await fetch('/api/chat/message', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: input.value, userId: myId, timestamp }),
-  })
+    await fetch('/api/chat/message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: input.value, userId: myId, timestamp }),
+    })
+  } catch (error) {
+    console.error('发送消息失败:', error)
+  }
 
   input.value = ''
 }
@@ -104,14 +108,17 @@ const startStream = () => {
   eventSource.onmessage = (event: MessageEvent) => {
     const data = JSON.parse(event.data)
     if (data.userId !== myId) {
-      chatMessages.value.push({ message: data.message, userId: data.userId, timestamp: data.timestamp, })
+      chatMessages.value.push(data)
       scrollToBottom()
     }
   }
 
   eventSource.onerror = () => {
-    console.error('SSE 连接出错')
+    console.error('SSE 连接出错，尝试重连...')
     eventSource?.close()
+    setTimeout(() => {
+      startStream()
+    }, 1000)
   }
 }
 
