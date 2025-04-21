@@ -1,10 +1,21 @@
 <template>
   <div class="chat-wrapper">
     <div class="chat-history" ref="chatContainer">
-      <div v-for="(msg, index) in chatMessages" :key="index"
-        :class="['chat-bubble', msg.userId === myId ? 'right' : 'left']">
-        <div class="message-text">{{ msg.message }}</div>
-        <div :class="['message-time', msg.userId === myId ? 'r-time' : 'l-time']">{{ formatTime(msg.timestamp) }}</div>
+      <div v-for="(msg, index) in chatMessages" :key="msg.timestamp"
+        :class="['chat-bubble-wrapper', msg.userId === myId ? 'right' : 'left']">
+
+        <div v-if="msg.userId !== myId" class="avatar" :style="{ backgroundColor: getUserInfo(msg.userId).color }">
+          {{ getUserInfo(msg.userId).nickname.slice(-2) }}
+        </div>
+        <div>
+          <div class="nickname" v-if="msg.userId !== myId">{{ getUserInfo(msg.userId).nickname }}</div>
+          <div class="chat-bubble" :class="msg.userId === myId ? 'right' : 'left'">
+            <div class="message-text">{{ msg.message }}</div>
+            <div :class="['message-time', msg.userId === myId ? 'r-time' : 'l-time']">
+              {{ formatTime(msg.timestamp) }}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -19,8 +30,43 @@
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { v4 as uuidv4 } from 'uuid'
 
+const generateNickname = (userId: string) => {
+  return `User-${userId.slice(0, 4)}`
+}
+
+const avatarColors = ['#FF9AA2', '#FFB347', '#FFDAC1', '#B5EAD7', '#C7CEEA', '#A0CED9', '#E0BBE4', '#D5AAFF']
+const generateColor = (userId: string) => {
+  const hash = Array.from(userId).reduce((acc, char) => acc + char.charCodeAt(0), 0)
+  return avatarColors[hash % avatarColors.length]
+}
+
 const myId = localStorage.getItem('userId') || uuidv4()
+const myNickname = localStorage.getItem('nickname') || generateNickname(myId)
+const myColor = localStorage.getItem('avatarColor') || generateColor(myId)
 localStorage.setItem('userId', myId)
+localStorage.setItem('nickname', myNickname)
+localStorage.setItem('avatarColor', myColor)
+
+const userInfoMap = new Map<string, { nickname: string; color: string }>()
+
+const getUserInfo = (userId: string): { nickname: string; color: string } => {
+  if (userId === myId) {
+    return { nickname: myNickname, color: myColor }
+  }
+
+  if (!userInfoMap.has(userId)) {
+    const nickname = generateNickname(userId)
+    const color = generateColor(userId)
+    const info = { nickname, color }
+    userInfoMap.set(userId, info)
+    return info
+  }
+
+  const info = userInfoMap.get(userId)
+  // 防御性判断（避免为 undefined）
+  return info || { nickname: '未知用户', color: '#ccc' }
+}
+
 
 const chatMessages = ref<{ message: string; userId: string, timestamp: string }[]>([])
 const input = ref('')
@@ -81,7 +127,7 @@ const getChatHistory = async () => {
 }
 
 const formatTime = (timestamp: string) => {
-  
+
   const date = new Date(timestamp)
   const now = new Date()
 
@@ -213,5 +259,37 @@ button {
   font-size: 12px;
   margin-top: 4px;
   text-align: left;
+}
+
+.chat-bubble-wrapper {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.chat-bubble-wrapper.left {
+  flex-direction: row;
+}
+
+.chat-bubble-wrapper.right {
+  flex-direction: row-reverse;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 14px;
+  font-weight: bold;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nickname {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 4px;
 }
 </style>
