@@ -1,7 +1,7 @@
 <template>
-  <TypingStream />
+  <ChatRoom />
 </template>
 
 <script setup lang="ts">
-import TypingStream from './components/TypingStream.vue'
+import ChatRoom from './components/ChatRoom.vue'
 </script>

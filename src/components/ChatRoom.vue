@@ -1,34 +1,47 @@
 <template>
-  <div class="chat-wrapper">
-    <div class="chat-history" ref="chatContainer">
-      <div v-for="(msg, index) in chatMessages" :key="msg.timestamp"
-        :class="['chat-bubble-wrapper', msg.userId === myId ? 'right' : 'left']">
-        <div v-if="msg.userId !== myId" class="avatar"
-          :style="{ backgroundColor: getUserInfo(msg.userId).color || '#ccc' }">
-          {{ getUserInfo(msg.userId).nickname.slice(0, 2) || '??' }}
-        </div>
-        <div>
-          <div class="nickname" v-if="msg.userId !== myId">{{ getUserInfo(msg.userId).nickname }}</div>
-          <div class="chat-bubble" :class="msg.userId === myId ? 'right' : 'left'">
-            <div class="message-text">{{ msg.message }}</div>
+  <div class="chat-room-container">
+    <div class="chat-wrapper">
+      <div class="chat-history" ref="chatContainer">
+        <div v-for="(msg, index) in chatMessages" :key="msg.timestamp"
+          :class="['chat-bubble-wrapper', msg.userId === myId ? 'right' : 'left']">
+          <div v-if="msg.userId !== myId" class="avatar"
+            :style="{ backgroundColor: getUserInfo(msg.userId).color || '#ccc' }">
+            {{ getUserInfo(msg.userId).nickname.slice(0, 2) || '??' }}
           </div>
-          <div :class="['message-time', msg.userId === myId ? 'r-time' : 'l-time']">
-            {{ formatTime(msg.timestamp) }}
+          <div>
+            <div class="nickname" v-if="msg.userId !== myId">{{ getUserInfo(msg.userId).nickname }}</div>
+            <div class="chat-bubble" :class="msg.userId === myId ? 'right' : 'left'">
+              <div class="message-text">{{ msg.message }}</div>
+            </div>
+            <div :class="['message-time', msg.userId === myId ? 'r-time' : 'l-time']">
+              {{ formatTime(msg.timestamp) }}
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <div class="input-box">
-      <input v-model="input" @keyup.enter="sendMessage" placeholder="输入你的消息" />
-      <button @click="sendMessage">发送</button>
+      <div class="input-box">
+        <input v-model="input" @keyup.enter="sendMessage" placeholder="输入你的消息" />
+        <button @click="sendMessage">发送</button>
+      </div>
     </div>
+    <UserList :userIds="Array.from(userSet)" :getUserInfo="getUserInfo" :chatMessages="chatMessages" :myId="myId" />
   </div>
 </template>
 
 <script setup lang="ts">
+import UserList from './UserList.vue'
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { v4 as uuidv4 } from 'uuid'
+
+const userSet = ref<Set<string>>(new Set())
+
+// 每次有新消息就把 userId 放进去
+const addUserIfNotExists = (userId: string) => {
+  if (!userSet.value.has(userId)) {
+    userSet.value.add(userId)
+  }
+}
 
 const generateNickname = (userId: string) => {
   return `User-${userId.slice(0, 4)}`
@@ -85,6 +98,7 @@ const sendMessage = async () => {
     // 本地显示
     const timestamp = new Date().toISOString()
     chatMessages.value.push({ message: input.value, userId: myId, timestamp })
+    addUserIfNotExists(myId)
     scrollToBottom()
 
     await fetch('/api/chat/message', {
@@ -106,6 +120,7 @@ const startStream = () => {
     const data = JSON.parse(event.data)
     if (data.userId !== myId) {
       chatMessages.value.push(data)
+      addUserIfNotExists(data.userId)
       scrollToBottom()
     }
   }
@@ -122,11 +137,10 @@ const startStream = () => {
 const getChatHistory = async () => {
   const response = await fetch('/api/chat/history')
   const data = await response.json()
-  chatMessages.value = data.map((msg: { message: string; userId: string, timestamp: string }) => ({
-    message: msg.message,
-    userId: msg.userId,
-    timestamp: msg.timestamp
-  }))
+  chatMessages.value = data.map((msg) => {
+    addUserIfNotExists(msg.userId)
+    return msg
+  })
   scrollToBottom()
 }
 
@@ -177,10 +191,15 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.chat-room-container {
+  display: flex;
+  height: 100vh;
+}
+
 .chat-wrapper {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  height: 100vh;
 }
 
 .chat-history {
